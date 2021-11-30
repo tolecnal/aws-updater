@@ -273,8 +273,21 @@ if ( $choiceRTN -ne 1 ) {
         $enaTempPath = "$awsTempPath\AwsEnaNetworkDriver.zip"
         Start-FileTransfer -url $enaUrl -destination $enaTempPath | Out-Null
         Unblock-File $enaTempPath
-
-        Expand-Archive -Path $enaTempPath -DestinationPath "$awsTempPath\ena" | Out-Null
+ 
+        if ($PSVersionTable.PSVersion.Major -eq 4) {
+            try {
+                Add-Type -assembly "system.io.compression.filesystem"
+                [io.compression.zipfile]::ExtractToDirectory($enaTempPath, "$awsTempPath\ena")
+            }
+            catch {
+                Write-Host "An error occured during extraction of the ENA drivers"
+                Write-Host $_.ScriptStackTrace
+            }
+        }
+        else {
+            Expand-Archive -Path $enaTempPath -DestinationPath "$awsTempPath\ena" | Out-Null
+        }
+        
         & "$awsTempPath\ena\install.ps1" | Out-Null
 
         Write-EventLog -LogName "Setup" -Source $awsUpdateName -EventId 2 -Category 1 -EntryType Information -Message "ENA driver upgraded from $enaVersion to $enaVersionLatest"
@@ -294,7 +307,20 @@ if ( $choiceRTN -ne 1 ) {
         Start-FileTransfer -url $nvmwUrl -destination $nvmeTempPath | Out-Null
         Unblock-File -Path $nvmeTempPath
 
-        Expand-Archive -Path $nvmeTempPath -DestinationPath "$awsTempPath\nvme" | Out-Null
+        if ($PSVersionTable.PSVersion.Major -eq 4) {
+            try {
+                Add-Type -assembly "system.io.compression.filesystem"
+                [io.compression.zipfile]::ExtractToDirectory($nvmeTempPath, "$awsTempPath\nvme")
+            }
+            catch {
+                Write-Host "An error occured during extraction of the NVMe drivers"
+                Write-Host $_.ScriptStackTrace
+            }
+        }
+        else {
+            Expand-Archive -Path $nvmeTempPath -DestinationPath "$awsTempPath\nvme" | Out-Null
+        }
+
         & "$awsTempPath\nvme\install.ps1" | Out-Null
 
         Write-EventLog -LogName "Setup" -Source $awsUpdateName -EventId 2 -Category 1 -EntryType Information -Message "NVMe driver upgraded from $nvmeVersion to $enaVersionLatest"

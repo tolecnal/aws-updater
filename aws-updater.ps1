@@ -10,7 +10,7 @@
     .NOTES
     File Name  :aws-updater.ps1
     Author     : Jostein Elvaker Haande
-    Email      : jostein.haande@virtualworks.com
+    Email      : jostein.haande@ayfie.com
     Requires   : PowerShell Version 4.0 and RunAsAdministrator
 #>
 

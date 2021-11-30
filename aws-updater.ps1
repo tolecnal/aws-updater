@@ -1,5 +1,8 @@
 #requires -version 4.0 -runasadministrator
 
+# fix for TLS issue
+[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+
 <#
     .Synopsis
     This script is used to udpate AWS software components on an EC2 instance

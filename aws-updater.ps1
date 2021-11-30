@@ -40,7 +40,8 @@ function Start-FileTransfer {
     )
 
     if ($PSVersionTable.PSVersion.Major -ge 5) {
-        try {
+        i        try {
+            # ps 5.0 is available
             Write-Debug "PS 5 available, using BitsTransfer"
             Start-BitsTransfer -source $url -Destination $destination
         }
@@ -53,6 +54,7 @@ function Start-FileTransfer {
     }
     else {
         try {
+            # seems like we are using PS 4.0
             Invoke-WebRequest -Uri $url -OutFile $destination -UseBasicParsing
         }
         catch {
@@ -64,14 +66,18 @@ function Start-FileTransfer {
 }
 #endregion
 
-
 #region script
+
+# First we set some internal variables
 $awsUpdateName = "AWS component updater"
 $awsTempPath = "$env:USERPROFILE\Desktop\awsTemp"
 
+# Then we get all installed applications and drivers
 $installedApps = Get-WmiObject -Class Win32_Product | Select-Object Name, Version
 $installedDrivers = Get-WmiObject Win32_PnPSignedDriver | Select-Object DeviceName, Manufacturer, DriverVersion
 
+# Then we download the most recent version number from GitHub
+# And compoare these with the versions installed
 [System.Version]$cfnVersion = $installedApps | Where-Object { $_.Name -like 'aws-cfn-bootstrap' } | Select-Object -ExpandProperty Version
 [System.Version]$cfnVersionLatest = $(Invoke-WebRequest -Uri https://raw.githubusercontent.com/tolecnal/aws-updater/main/cfn.txt -UseBasicParsing).Content
 [string]$cfnURL = "https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-win64-latest.exe"
@@ -88,6 +94,9 @@ $installedDrivers = Get-WmiObject Win32_PnPSignedDriver | Select-Object DeviceNa
 [System.Version]$nvmeVersionLatest = $(Invoke-WebRequest -Uri https://raw.githubusercontent.com/tolecnal/aws-updater/main/nvme.txt -UseBasicParsing).Content
 [string]$nvmwUrl = "https://s3.amazonaws.com/ec2-windows-drivers-downloads/NVMe/Latest/AWSNVMe.zip"
 
+# In some cases the latest NVMe driver is not installed
+# And instead the default NVMe driver is used, if this is the case
+# then we set the version number to 0.0.0.0 to install the driver
 [System.Version]$stanvmeVersion = $installedDrivers | Where-Object { $_.DeviceName -like 'Standard NVM Express Controller' } | Select-Object -ExpandProperty DriverVersion -First 1
 if ($nvmeVersion -eq $null -and $stanvmeVersion) {
     $nvmeVersion = "0.0.0.0"
@@ -101,6 +110,8 @@ if ($nvmeVersion -eq $null -and $stanvmeVersion) {
 [System.Version]$ssmVersionLatest = $(Invoke-WebRequest -Uri https://raw.githubusercontent.com/tolecnal/aws-updater/main/ssm.txt -UseBasicParsing).Content
 [string]$ssmUrl = "https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/windows_amd64/AmazonSSMAgentSetup.exe"
 
+# Then we create the table object used to display the
+# installed versions with their most recent ones
 $tabName = "Amazon AWS installed components"
 $table = New-Object system.Data.DataTable $tabName
 
@@ -147,11 +158,13 @@ $row.instVersion = $ssmVersion
 $row.offVersion = $ssmVersionLatest
 $table.Rows.Add($row)
 
+# Display the tables
 $table | Format-Table
-if ([System.Diagnostics.EventLog]::SourceExists($awsUpdateName) -eq $false) {
-    [System.Diagnostics.EventLog]::CreateEventSource($awsUpdateName, "Setup")
-}
 
+# Ensure logging source for Event Log exists
+New-EventLog -LogName Setup -Source "AWS component updater" -ErrorAction SilentlyContinue
+
+# Check if we are running on a Domain Controller
 $osInfo = Get-CimInstance -ClassName Win32_OperatingSystem
 if ($osInfo.ProductType -eq 2) {
     Write-Warning "This machine is running as a Domain Controller!"
@@ -160,10 +173,12 @@ if ($osInfo.ProductType -eq 2) {
     Write-Warning "reg add HKLM\SOFTWARE\Wow6432Node\Amazon\AWSPVDriverSetup /v DisableDCCheck /t REG_SZ /d true"
 }
 
+# Write a general warning to users of the script
 Write-Warning "This is your last chance to discontinue the script!"
 Write-Warning "The script MIGHT break your server instance - beware!"
 Write-Warning "Use the script at your own risk!"
 
+# Ask for confirmation before actually running the script
 $caption = "Please Confirm"    
 $message = "Are you Sure You Want To Proceed:"
 [int]$defaultChoice = 0
@@ -174,8 +189,10 @@ $choiceRTN = $host.ui.PromptForChoice($caption, $message, $options, $defaultChoi
 
 if ( $choiceRTN -ne 1 ) {
 
+    # Make temp folder for downloads
     mkdir $awsTempPath -Force -ErrorAction SilentlyContinue | Out-Null
 
+    # aws-cfn-bootstrap code
     Write-Host -ForegroundColor Green  "Checking aws-cfn-bootstrap"
     if ($cfnVersion -lt $cfnVersionLatest) {
         Write-Host "Installation outdated, upgrading..."
@@ -193,6 +210,7 @@ if ( $choiceRTN -ne 1 ) {
     }
     Write-Host " "
 
+    # ec2launch code
     Write-Host -ForegroundColor Green "Checking Amazon EC2Launch"
     if ($ec2launchVersion -lt $ec2launchVersionLatest) {
         Write-Host "Installation outdated, upgrading..."
@@ -215,6 +233,7 @@ if ( $choiceRTN -ne 1 ) {
     }
     Write-Host " "
 
+    # ENA driver code
     Write-Host -ForegroundColor Green "Amazon Elastic Network Adapter"
     if ($enaVersion -lt $enaVersionLatest) {
 
@@ -234,6 +253,7 @@ if ( $choiceRTN -ne 1 ) {
     }
     Write-Host " "
 
+    # NVMe driver code
     Write-Host -ForegroundColor Green "AWS NVMe Elastic Block Storage Adapter"
     if ($nvmeVersion -lt $nvmeVersionLatest) {
         Write-Host "Installation outdated, upgrading..."
@@ -252,6 +272,7 @@ if ( $choiceRTN -ne 1 ) {
     }
     Write-Host " "
 
+    # PV Driver code
     Write-Host -ForegroundColor Green "AWS PV Drivers"
     if ($pvVersion -lt $pvVersionLatest) {
         Write-Host "Installation outdated, upgrading..."
@@ -270,6 +291,7 @@ if ( $choiceRTN -ne 1 ) {
     }
     Write-Host " "
 
+    # SSM agent code
     Write-Host -ForegroundColor Green "Amazon SSM Agent"
     if ($ssmVersion -lt $ssmVersionLatest) {
         Write-Host "Installation outdated, upgrading..."
@@ -287,6 +309,7 @@ if ( $choiceRTN -ne 1 ) {
     }
     Write-Host " "
 
+    # clean up temp folder
     Write-Host "Cleaning up temporary files"
     Remove-Item $awsTempPath -Recurse -Force -ErrorAction SilentlyContinue | Out-Null
 

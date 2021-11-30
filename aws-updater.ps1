@@ -199,6 +199,17 @@ if ( $choiceRTN -ne 1 ) {
     Write-Host -ForegroundColor Green  "Checking aws-cfn-bootstrap"
     if ($cfnVersion -lt $cfnVersionLatest) {
         Write-Host "Installation outdated, upgrading..."
+        Write-Host "... first uninstalling current version"
+
+        $app = Get-WmiObject -Class Win32_Product -Filter "Name = 'aws-cfn-bootstrap'"
+        try {
+            $app.Uninstall() | Out-Null
+            Start-Sleep 20
+        }
+        catch {
+            Write-Host "An error occured during uninstall of aws-cfn-bootstrap"
+            Write-Host $_.ScriptStackTrace
+        }
 
         $cfnTempPath = "$awsTempPath\aws-cfn-bootstrap-py3-win64-latest.exe"
         Start-FileTransfer -url $cfnURL -destination $cfnTempPath | Out-Null

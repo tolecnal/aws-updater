@@ -201,14 +201,16 @@ if ( $choiceRTN -ne 1 ) {
         Write-Host "Installation outdated, upgrading..."
         Write-Host "... first uninstalling current version"
 
-        $app = Get-WmiObject -Class Win32_Product -Filter "Name = 'aws-cfn-bootstrap'"
-        try {
-            $app.Uninstall() | Out-Null
-            Start-Sleep 20
-        }
-        catch {
-            Write-Host "An error occured during uninstall of aws-cfn-bootstrap"
-            Write-Host $_.ScriptStackTrace
+        $app = Get-WmiObject -Class Win32_Product -Filter "Name = 'aws-cfn-bootstrap'" | Out-Null
+        if ($app) {
+            try {
+                $app.Uninstall() | Out-Null
+                Start-Sleep 45
+            }
+            catch {
+                Write-Host "An error occured during uninstall of aws-cfn-bootstrap"
+                Write-Host $_.ScriptStackTrace
+            }
         }
 
         $cfnTempPath = "$awsTempPath\aws-cfn-bootstrap-py3-win64-latest.exe"
@@ -228,6 +230,19 @@ if ( $choiceRTN -ne 1 ) {
     Write-Host -ForegroundColor Green "Checking Amazon EC2Launch"
     if ($ec2launchVersion -lt $ec2launchVersionLatest) {
         Write-Host "Installation outdated, upgrading..."
+
+        $app = Get-WmiObject -Class Win32_Product -Filter "Name = 'EC2ConfigService'" | Out-Null
+        if ($app) {
+            try {
+                Write-Host "... uninstalling deprecated EC2ConfigService"
+                $app.Uninstall() | Out-Null
+                Start-Sleep 20
+            }
+            catch {
+                Write-Host "An error occured during uninstall of EC2ConfigService"
+                Write-Host $_.ScriptStackTrace
+            }
+        }
 
         $ec2launchTempPath = "$awsTempPath\AmazonEC2Launch.msi"
         Start-FileTransfer -url $ec2launchUrl -destination $ec2launchTempPath | Out-Null

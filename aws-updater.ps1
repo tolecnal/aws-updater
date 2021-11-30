@@ -215,6 +215,7 @@ if ( $choiceRTN -ne 1 ) {
 
         $cfnTempPath = "$awsTempPath\aws-cfn-bootstrap-py3-win64-latest.exe"
         Start-FileTransfer -url $cfnURL -destination $cfnTempPath | Out-Null
+        Unblock-File -Path $cfnTempPath
 
         Invoke-Item $cfnTempPath | Out-Null
     
@@ -246,6 +247,7 @@ if ( $choiceRTN -ne 1 ) {
 
         $ec2launchTempPath = "$awsTempPath\AmazonEC2Launch.msi"
         Start-FileTransfer -url $ec2launchUrl -destination $ec2launchTempPath | Out-Null
+        Unblock-File -Path $ec2launchTempPath
 
         try {
             msiexec /i "$ec2launchTempPath" | Out-Null
@@ -270,6 +272,7 @@ if ( $choiceRTN -ne 1 ) {
 
         $enaTempPath = "$awsTempPath\AwsEnaNetworkDriver.zip"
         Start-FileTransfer -url $enaUrl -destination $enaTempPath | Out-Null
+        Unblock-File $enaTempPath
 
         Expand-Archive -Path $enaTempPath -DestinationPath "$awsTempPath\ena" | Out-Null
         & "$awsTempPath\ena\install.ps1" | Out-Null
@@ -289,6 +292,7 @@ if ( $choiceRTN -ne 1 ) {
 
         $nvmeTempPath = "$awsTempPath\AWSNVMe.zip"
         Start-FileTransfer -url $nvmwUrl -destination $nvmeTempPath | Out-Null
+        Unblock-File -Path $nvmeTempPath
 
         Expand-Archive -Path $nvmeTempPath -DestinationPath "$awsTempPath\nvme" | Out-Null
         & "$awsTempPath\nvme\install.ps1" | Out-Null
@@ -308,6 +312,7 @@ if ( $choiceRTN -ne 1 ) {
 
         $pvTempPath = "$awsTempPath\AWSPVDriver.zip"
         Start-FileTransfer -url $pvUrl -destination $pvTempPath | Out-Null
+        Unblock-File $pvTempPath
 
         Expand-Archive -Path $pvTempPath -DestinationPath "$awsTempPath\AWSPVDriver" | Out-Null
         msiexec /i "$awsTempPath\AWSPVDriver\install.ps1" | Out-Null
@@ -327,6 +332,7 @@ if ( $choiceRTN -ne 1 ) {
 
         $ssmTempPath = "$awsTempPath\AmazonSSMAgentSetup.exe"
         Start-FileTransfer -url $ssmUrl -destination $ssmTempPath | Out-Null
+        Unblock-File -Path $ssmTempPath
 
         Start-Process -FilePath $ssmTempPath -ArgumentList "/S" | Out-Null
 

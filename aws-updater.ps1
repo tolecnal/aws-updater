@@ -40,7 +40,7 @@ function Start-FileTransfer {
     )
 
     if ($PSVersionTable.PSVersion.Major -ge 5) {
-        i        try {
+        try {
             # ps 5.0 is available
             Write-Debug "PS 5 available, using BitsTransfer"
             Start-BitsTransfer -source $url -Destination $destination

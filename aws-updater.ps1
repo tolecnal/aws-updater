@@ -148,122 +148,151 @@ $row.offVersion = $ssmVersionLatest
 $table.Rows.Add($row)
 
 $table | Format-Table
+if ([System.Diagnostics.EventLog]::SourceExists($awsUpdateName) -eq $false) {
+    [System.Diagnostics.EventLog]::CreateEventSource($awsUpdateName, "Setup")
+}
 
-mkdir $awsTempPath -Force -ErrorAction SilentlyContinue | Out-Null
+$osInfo = Get-CimInstance -ClassName Win32_OperatingSystem
+if ($osInfo.ProductType -eq 2) {
+    Write-Warning "This machine is running as a Domain Controller!"
+    Write-Warning "Running this script is done solely at your own risk."
+    Write-Warning "To be able to update the PV drivers you will need this registry key"
+    Write-Warning "reg add HKLM\SOFTWARE\Wow6432Node\Amazon\AWSPVDriverSetup /v DisableDCCheck /t REG_SZ /d true"
+}
 
-Write-Host -ForegroundColor Green  "Checking aws-cfn-bootstrap"
-if ($cfnVersion -lt $cfnVersionLatest) {
-    Write-Host "Installation outdated, upgrading..."
+Write-Warning "This is your last chance to discontinue the script!"
+Write-Warning "The script MIGHT break your server instance - beware!"
+Write-Warning "Use the script at your own risk!"
 
-    $cfnTempPath = "$awsTempPath\aws-cfn-bootstrap-py3-win64-latest.exe"
-    Start-FileTransfer -url $cfnURL -destination $cfnTempPath | Out-Null
+$caption = "Please Confirm"    
+$message = "Are you Sure You Want To Proceed:"
+[int]$defaultChoice = 0
+$yes = New-Object System.Management.Automation.Host.ChoiceDescription "&Yes", "Do the job."
+$no = New-Object System.Management.Automation.Host.ChoiceDescription "&No", "Do not do the job."
+$options = [System.Management.Automation.Host.ChoiceDescription[]]($yes, $no)
+$choiceRTN = $host.ui.PromptForChoice($caption, $message, $options, $defaultChoice)
 
-    Invoke-Item $cfnTempPath | Out-Null
+if ( $choiceRTN -ne 1 ) {
+
+    mkdir $awsTempPath -Force -ErrorAction SilentlyContinue | Out-Null
+
+    Write-Host -ForegroundColor Green  "Checking aws-cfn-bootstrap"
+    if ($cfnVersion -lt $cfnVersionLatest) {
+        Write-Host "Installation outdated, upgrading..."
+
+        $cfnTempPath = "$awsTempPath\aws-cfn-bootstrap-py3-win64-latest.exe"
+        Start-FileTransfer -url $cfnURL -destination $cfnTempPath | Out-Null
+
+        Invoke-Item $cfnTempPath | Out-Null
     
-    Write-EventLog -LogName "Setup" -Source $awsUpdateName -EventId 2 -Category 1 -EntryType Information -Message "aws-cfn-bootstrap upgraded from $cfnVersion to $cfnVersionLatest"
-    Write-Output "Job aws-cfn-bootstrap complete"
-}
-else {
-    Write-Host "Installation up to date, doing nothing"
-}
-Write-Host " "
-
-Write-Host -ForegroundColor Green "Checking Amazon EC2Launch"
-if ($ec2launchVersion -lt $ec2launchVersionLatest) {
-    Write-Host "Installation outdated, upgrading..."
-
-    $ec2launchTempPath = "$awsTempPath\AmazonEC2Launch.msi"
-    Start-FileTransfer -url $ec2launchUrl -destination $ec2launchTempPath | Out-Null
-
-    try {
-        msiexec /i "$ec2launchTempPath" | Out-Null
+        Write-EventLog -LogName "Setup" -Source $awsUpdateName -EventId 2 -Category 1 -EntryType Information -Message "aws-cfn-bootstrap upgraded from $cfnVersion to $cfnVersionLatest"
+        Write-Output "Job aws-cfn-bootstrap complete"
     }
-    catch {
-        Write-Host "An error running msiexec for ec2Launch"
-        Write-Host $_.ScriptStackTrace
+    else {
+        Write-Host "Installation up to date, doing nothing"
     }
-    Write-EventLog -LogName "Setup" -Source $awsUpdateName -EventId 2 -Category 1 -EntryType Information -Message "EC2Launch upgraded from $ec2launchVersion to $ec2launchVersionLatest"
-    Write-Output "Job EC2Launch complete"
-}
-else {
-    Write-Host "Installation up to date, doing nothing"
-}
-Write-Host " "
+    Write-Host " "
 
-Write-Host -ForegroundColor Green "Amazon Elastic Network Adapter"
-if ($enaVersion -lt $enaVersionLatest) {
+    Write-Host -ForegroundColor Green "Checking Amazon EC2Launch"
+    if ($ec2launchVersion -lt $ec2launchVersionLatest) {
+        Write-Host "Installation outdated, upgrading..."
 
-    Write-Host "Installation outdated, upgrading..."
+        $ec2launchTempPath = "$awsTempPath\AmazonEC2Launch.msi"
+        Start-FileTransfer -url $ec2launchUrl -destination $ec2launchTempPath | Out-Null
 
-    $enaTempPath = "$awsTempPath\AwsEnaNetworkDriver.zip"
-    Start-FileTransfer -url $enaUrl -destination $enaTempPath | Out-Null
+        try {
+            msiexec /i "$ec2launchTempPath" | Out-Null
+        }
+        catch {
+            Write-Host "An error running msiexec for ec2Launch"
+            Write-Host $_.ScriptStackTrace
+        }
+        Write-EventLog -LogName "Setup" -Source $awsUpdateName -EventId 2 -Category 1 -EntryType Information -Message "EC2Launch upgraded from $ec2launchVersion to $ec2launchVersionLatest"
+        Write-Output "Job EC2Launch complete"
+    }
+    else {
+        Write-Host "Installation up to date, doing nothing"
+    }
+    Write-Host " "
 
-    Expand-Archive -Path $enaTempPath -DestinationPath "$awsTempPath\ena" | Out-Null
-    & "$awsTempPath\ena\install.ps1" | Out-Null
+    Write-Host -ForegroundColor Green "Amazon Elastic Network Adapter"
+    if ($enaVersion -lt $enaVersionLatest) {
 
-    Write-EventLog -LogName "Setup" -Source $awsUpdateName -EventId 2 -Category 1 -EntryType Information -Message "ENA driver upgraded from $enaVersion to $enaVersionLatest"
-    Write-Host "Job ENA driver complete"
-}
-else {
-    Write-Host "Installation up to date, doing nothing"
-}
-Write-Host " "
+        Write-Host "Installation outdated, upgrading..."
 
-Write-Host -ForegroundColor Green "AWS NVMe Elastic Block Storage Adapter"
-if ($nvmeVersion -lt $nvmeVersionLatest) {
-    Write-Host "Installation outdated, upgrading..."
+        $enaTempPath = "$awsTempPath\AwsEnaNetworkDriver.zip"
+        Start-FileTransfer -url $enaUrl -destination $enaTempPath | Out-Null
 
-    $nvmeTempPath = "$awsTempPath\AWSNVMe.zip"
-    Start-FileTransfer -url $nvmwUrl -destination $nvmeTempPath | Out-Null
+        Expand-Archive -Path $enaTempPath -DestinationPath "$awsTempPath\ena" | Out-Null
+        & "$awsTempPath\ena\install.ps1" | Out-Null
 
-    Expand-Archive -Path $nvmeTempPath -DestinationPath "$awsTempPath\nvme" | Out-Null
-    & "$awsTempPath\nvme\install.ps1" | Out-Null
+        Write-EventLog -LogName "Setup" -Source $awsUpdateName -EventId 2 -Category 1 -EntryType Information -Message "ENA driver upgraded from $enaVersion to $enaVersionLatest"
+        Write-Host "Job ENA driver complete"
+    }
+    else {
+        Write-Host "Installation up to date, doing nothing"
+    }
+    Write-Host " "
 
-    Write-EventLog -LogName "Setup" -Source $awsUpdateName -EventId 2 -Category 1 -EntryType Information -Message "NVMe driver upgraded from $nvmeVersion to $enaVersionLatest"
-    Write-Host "Job NVMe Driver complete"
-}
-else {
-    Write-Host "Installation up to date, doing nothing"
-}
-Write-Host " "
+    Write-Host -ForegroundColor Green "AWS NVMe Elastic Block Storage Adapter"
+    if ($nvmeVersion -lt $nvmeVersionLatest) {
+        Write-Host "Installation outdated, upgrading..."
 
-Write-Host -ForegroundColor Green "AWS PV Drivers"
-if ($pvVersion -lt $pvVersionLatest) {
-    Write-Host "Installation outdated, upgrading..."
+        $nvmeTempPath = "$awsTempPath\AWSNVMe.zip"
+        Start-FileTransfer -url $nvmwUrl -destination $nvmeTempPath | Out-Null
 
-    $pvTempPath = "$awsTempPath\AWSPVDriver.zip"
-    Start-FileTransfer -url $pvUrl -destination $pvTempPath | Out-Null
+        Expand-Archive -Path $nvmeTempPath -DestinationPath "$awsTempPath\nvme" | Out-Null
+        & "$awsTempPath\nvme\install.ps1" | Out-Null
 
-    Expand-Archive -Path $pvTempPath -DestinationPath "$awsTempPath\AWSPVDriver" | Out-Null
-    msiexec /i "$awsTempPath\AWSPVDriver\install.ps1" | Out-Null
+        Write-EventLog -LogName "Setup" -Source $awsUpdateName -EventId 2 -Category 1 -EntryType Information -Message "NVMe driver upgraded from $nvmeVersion to $enaVersionLatest"
+        Write-Host "Job NVMe Driver complete"
+    }
+    else {
+        Write-Host "Installation up to date, doing nothing"
+    }
+    Write-Host " "
+
+    Write-Host -ForegroundColor Green "AWS PV Drivers"
+    if ($pvVersion -lt $pvVersionLatest) {
+        Write-Host "Installation outdated, upgrading..."
+
+        $pvTempPath = "$awsTempPath\AWSPVDriver.zip"
+        Start-FileTransfer -url $pvUrl -destination $pvTempPath | Out-Null
+
+        Expand-Archive -Path $pvTempPath -DestinationPath "$awsTempPath\AWSPVDriver" | Out-Null
+        msiexec /i "$awsTempPath\AWSPVDriver\install.ps1" | Out-Null
  
-    Write-EventLog -LogName "Setup" -Source $awsUpdateName -EventId 2 -Category 1 -EntryType Information -Message "PV driver upgraded from $pvVersion to $pvVersionLatest"
-    Write-Host "Job PV Driver complete"
+        Write-EventLog -LogName "Setup" -Source $awsUpdateName -EventId 2 -Category 1 -EntryType Information -Message "PV driver upgraded from $pvVersion to $pvVersionLatest"
+        Write-Host "Job PV Driver complete"
+    }
+    else {
+        Write-Host "Installation up to date, doing nothing"
+    }
+    Write-Host " "
+
+    Write-Host -ForegroundColor Green "Amazon SSM Agent"
+    if ($ssmVersion -lt $ssmVersionLatest) {
+        Write-Host "Installation outdated, upgrading..."
+
+        $ssmTempPath = "$awsTempPath\AmazonSSMAgentSetup.exe"
+        Start-FileTransfer -url $ssmUrl -destination $ssmTempPath | Out-Null
+
+        Start-Process -FilePath $ssmTempPath -ArgumentList "/S" | Out-Null
+
+        Write-EventLog -LogName "Setup" -Source $awsUpdateName -EventId 2 -Category 1 -EntryType Information -Message "SSM agent upgraded from $ssmVersion to $ssmVersionLatest"
+        Write-Host "Job SSM Agent complete"
+    }
+    else {
+        Write-Host "Installation up to date, doing nothing"
+    }
+    Write-Host " "
+
+    Write-Host "Cleaning up temporary files"
+    Remove-Item $awsTempPath -Recurse -Force -ErrorAction SilentlyContinue | Out-Null
+
+    Write-Host -ForegroundColor Green "AWS update complete"
 }
 else {
-    Write-Host "Installation up to date, doing nothing"
+    Write-Warning "Script aborted due to user input"
 }
-Write-Host " "
-
-Write-Host -ForegroundColor Green "Amazon SSM Agent"
-if ($ssmVersion -lt $ssmVersionLatest) {
-    Write-Host "Installation outdated, upgrading..."
-
-    $ssmTempPath = "$awsTempPath\AmazonSSMAgentSetup.exe"
-    Start-FileTransfer -url $ssmUrl -destination $ssmTempPath | Out-Null
-
-    Start-Process -FilePath $ssmTempPath -ArgumentList "/S" | Out-Null
-
-    Write-EventLog -LogName "Setup" -Source $awsUpdateName -EventId 2 -Category 1 -EntryType Information -Message "SSM agent upgraded from $ssmVersion to $ssmVersionLatest"
-    Write-Host "Job SSM Agent complete"
-}
-else {
-    Write-Host "Installation up to date, doing nothing"
-}
-Write-Host " "
-
-Write-Host "Cleaning up temporary files"
-Remove-Item $awsTempPath -Recurse -Force -ErrorAction SilentlyContinue | Out-Null
-
-Write-Host -ForegroundColor Green "AWS update complete"
 #endregion

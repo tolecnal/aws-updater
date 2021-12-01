@@ -50,7 +50,7 @@ function Start-FileTransfer {
         }
         catch {
             Write-Debug "Not running on recent PS, falling back to Invoke-WebRequest"
-            Write-Host "An error occurred connecting to SharePoint Online"
+            Write-Host "An error occurred downloading file $url using Bits Transfer"
             Write-Host $_.ScriptStackTrace
             exit 1
         }
@@ -61,7 +61,7 @@ function Start-FileTransfer {
             Invoke-WebRequest -Uri $url -OutFile $destination -UseBasicParsing
         }
         catch {
-            Write-Host "An error occurred connecting to SharePoint Online"
+            Write-Host "An error occurred downloading file $url using Invoke-WebRequest"
             Write-Host $_.ScriptStackTrace
             exit 1
         }

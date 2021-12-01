@@ -201,7 +201,8 @@ if ( $choiceRTN -ne 1 ) {
         Write-Host "Installation outdated, upgrading..."
         Write-Host "... first uninstalling current version"
 
-        $app = Get-WmiObject -Class Win32_Product -Filter "Name = 'aws-cfn-bootstrap'" | Out-Null
+        $app = Get-WmiObject -Class Win32_Product -Filter "Name = 'aws-cfn-bootstrap'"
+        Start-Sleep 10
         if ($app) {
             try {
                 $app.Uninstall() | Out-Null
@@ -232,7 +233,8 @@ if ( $choiceRTN -ne 1 ) {
     if ($ec2launchVersion -lt $ec2launchVersionLatest) {
         Write-Host "Installation outdated, upgrading..."
 
-        $app = Get-WmiObject -Class Win32_Product -Filter "Name = 'EC2ConfigService'" | Out-Null
+        $app = Get-WmiObject -Class Win32_Product -Filter "Name = 'EC2ConfigService'"
+        Start-Sleep 10
         if ($app) {
             try {
                 Write-Host "... uninstalling deprecated EC2ConfigService"

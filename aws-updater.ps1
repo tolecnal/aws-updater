@@ -76,41 +76,59 @@ $awsUpdateName = "AWS component updater"
 $awsTempPath = "$env:USERPROFILE\Desktop\awsTemp"
 
 # Then we get all installed applications and drivers
-$installedApps = Get-WmiObject -Class Win32_Product | Select-Object Name, Version
+$installedApps = @()
+$installedApps += Get-ItemProperty "HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" # 32 Bit
+$installedApps += Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*"  
+$installedApps = $installedApps | Select-Object DisplayName, DisplayVersion
 $installedDrivers = Get-WmiObject Win32_PnPSignedDriver | Select-Object DeviceName, Manufacturer, DriverVersion
+
+try {
+    $currentVersions = $(Invoke-WebRequest -Uri https://raw.githubusercontent.com/tolecnal/aws-updater/main/versions.json -UseBasicParsing).Content | ConvertFrom-Json    
+}
+catch {
+    throw "Unable to download version information from GitHub"
+    exit 1
+}
 
 # Then we download the most recent version number from GitHub
 # And compoare these with the versions installed
-[System.Version]$cfnVersion = $installedApps | Where-Object { $_.Name -like 'aws-cfn-bootstrap' } | Select-Object -ExpandProperty Version
-[System.Version]$cfnVersionLatest = $(Invoke-WebRequest -Uri https://raw.githubusercontent.com/tolecnal/aws-updater/main/cfn.txt -UseBasicParsing).Content
+[System.Version]$cfnVersion = $installedApps | Where-Object { $_.DisplayName -like 'aws-cfn-bootstrap' } | Select-Object -ExpandProperty DisplayVersion | Sort-Object -Descending |
+Select-Object -First 1
+[System.Version]$cfnVersionLatest = $currentVersions.details | Where-Object { $_.key -like 'cfn' } | Select-Object -ExpandProperty latest_version
 [string]$cfnURL = "https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-win64-latest.exe"
 
-[System.Version]$ec2launchVersion = $installedApps | Where-Object { $_.Name -like 'Amazon EC2Launch' } | Select-Object -ExpandProperty Version
-[System.Version]$ec2launchVersionLatest = $(Invoke-WebRequest -Uri https://raw.githubusercontent.com/tolecnal/aws-updater/main/ec2launch.txt -UseBasicParsing).Content
+[System.Version]$ec2launchVersion = $installedApps | Where-Object { $_.DisplayName -like 'Amazon EC2Launch' } | Select-Object -ExpandProperty DisplayVersion | Sort-Object -Descending |
+Select-Object -First 1
+[System.Version]$ec2launchVersionLatest = $currentVersions.details | Where-Object { $_.key -like 'ec2launch' } | Select-Object -ExpandProperty latest_version
 [string]$ec2launchUrl = "https://s3.amazonaws.com/amazon-ec2launch-v2/windows/amd64/latest/AmazonEC2Launch.msi"
 
-[System.Version]$enaVersion = $installedDrivers | Where-Object { $_.DeviceName -like 'Amazon Elastic Network Adapter' } | Select-Object -ExpandProperty DriverVersion -First 1
-[System.Version]$enaVersionLatest = $(Invoke-WebRequest -Uri https://raw.githubusercontent.com/tolecnal/aws-updater/main/ena.txt -UseBasicParsing).Content
+[System.Version]$enaVersion = $installedDrivers | Where-Object { $_.DeviceName -like 'Amazon Elastic Network Adapter' } | Select-Object -ExpandProperty DriverVersion | Sort-Object -Descending |
+Select-Object -First 1
+[System.Version]$enaVersionLatest = $currentVersions.details | Where-Object { $_.key -like 'ena' } | Select-Object -ExpandProperty latest_version
 [string]$enaUrl = "https://s3.amazonaws.com/ec2-windows-drivers-downloads/ENA/Latest/AwsEnaNetworkDriver.zip"
 
-[System.Version]$nvmeVersion = $installedDrivers | Where-Object { $_.DeviceName -like 'AWS NVMe Elastic Block Storage Adapter' } | Select-Object -ExpandProperty DriverVersion -First 1
-[System.Version]$nvmeVersionLatest = $(Invoke-WebRequest -Uri https://raw.githubusercontent.com/tolecnal/aws-updater/main/nvme.txt -UseBasicParsing).Content
+[System.Version]$nvmeVersion = $installedDrivers | Where-Object { $_.DeviceName -like 'AWS NVMe Elastic Block Storage Adapter' } | Select-Object -ExpandProperty DriverVersion | Sort-Object -Descending |
+Select-Object -First 1
+[System.Version]$nvmeVersionLatest = $currentVersions.details | Where-Object { $_.key -like 'nvme' } | Select-Object -ExpandProperty latest_version
 [string]$nvmwUrl = "https://s3.amazonaws.com/ec2-windows-drivers-downloads/NVMe/Latest/AWSNVMe.zip"
 
 # In some cases the latest NVMe driver is not installed
 # And instead the default NVMe driver is used, if this is the case
 # then we set the version number to 0.0.0.0 to install the driver
-[System.Version]$stanvmeVersion = $installedDrivers | Where-Object { $_.DeviceName -like 'Standard NVM Express Controller' } | Select-Object -ExpandProperty DriverVersion -First 1
-if ($nvmeVersion -eq $null -and $stanvmeVersion) {
+[System.Version]$stanvmeVersion = $installedDrivers | Where-Object { $_.DeviceName -like 'Standard NVM Express Controller' } | Select-Object -ExpandProperty DriverVersion | Sort-Object -Descending |
+Select-Object -First 1
+if ($null -eq $nvmeVersion -and $stanvmeVersion) {
     $nvmeVersion = "0.0.0.0"
 }
 
-[System.Version]$pvVersion = $installedApps | Where-Object { $_.Name -like 'AWS PV Drivers' } | Select-Object -ExpandProperty Version
-[System.Version]$pvVersionLatest = $(Invoke-WebRequest -Uri https://raw.githubusercontent.com/tolecnal/aws-updater/main/pv.txt -UseBasicParsing).Content
+[System.Version]$pvVersion = $installedApps | Where-Object { $_.DisplayName -like 'AWS PV Drivers' } | Select-Object -ExpandProperty DisplayVersion | Sort-Object -Descending |
+Select-Object -First 1
+[System.Version]$pvVersionLatest = $currentVersions.details | Where-Object { $_.key -like 'pv' } | Select-Object -ExpandProperty latest_version
 [string]$pvUrl = "https://s3.amazonaws.com/ec2-windows-drivers-downloads/AWSPV/Latest/AWSPVDriver.zip"
 
-[System.Version]$ssmVersion = $installedApps | Where-Object { $_.Name -like 'Amazon SSM Agent' } | Select-Object -ExpandProperty Version
-[System.Version]$ssmVersionLatest = $(Invoke-WebRequest -Uri https://raw.githubusercontent.com/tolecnal/aws-updater/main/ssm.txt -UseBasicParsing).Content
+[System.Version]$ssmVersion = $installedApps | Where-Object { $_.DisplayName -like 'Amazon SSM Agent' } | Select-Object -ExpandProperty DisplayVersion | Sort-Object -Descending |
+Select-Object -First 1
+[System.Version]$ssmVersionLatest = $currentVersions.details | Where-Object { $_.key -like 'ssm' } | Select-Object -ExpandProperty latest_version
 [string]$ssmUrl = "https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/windows_amd64/AmazonSSMAgentSetup.exe"
 
 # Then we create the table object used to display the

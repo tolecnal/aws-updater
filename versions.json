@@ -1,5 +1,5 @@
 {
-  "programs": [
+  "details": [
     {
       "name": "aws-cfn-bootstrap",
       "description": "AWS CloudFormation Bootstrap Scripts",

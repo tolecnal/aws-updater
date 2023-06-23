@@ -5,6 +5,7 @@
       "description": "AWS CloudFormation Bootstrap Scripts",
       "id": 1,
       "latest_version": "2.0.25",
+      "key": "cfn",
       "created_at": "2023-06-23T12:00:00.000Z",
       "updated_at": "2023-06-23T12:00:00.000Z"
     },
@@ -13,6 +14,7 @@
       "description": "EC2 Windows Launch Scripts",
       "id": 2,
       "latest_version": "2.0.1303.0",
+      "key": "ec2launch"
       "created_at": "2023-06-23T12:00:00.000Z",
       "updated_at": "2023-06-23T12:00:00.000Z"
     },
@@ -21,6 +23,7 @@
       "description": "Amazon SSM Agent for EC2",
       "id": 3,
       "latest_version": "3.2.1041.0",
+      "key": "ssm",
       "created_at": "2023-06-23T12:00:00.000Z",
       "updated_at": "2023-06-23T12:00:00.000Z"
     },
@@ -29,6 +32,7 @@
       "description": "Amazon CloudWatch Agent for EC2",
       "id": 4,
       "latest_version": "1.247359.1",
+      "key": "cwa",
       "created_at": "2023-06-23T12:00:00.000Z",
       "updated_at": "2023-06-23T12:00:00.000Z"
     },
@@ -37,6 +41,7 @@
       "description": "NVMe Driver for Amazon EC2",
       "id": 5,
       "latest_version": "1.4.2",
+      "key": "nvme",
       "created_at": "2023-06-23T12:00:00.000Z",
       "updated_at": "2023-06-23T12:00:00.000Z"
     },
@@ -45,6 +50,7 @@
       "description": "ENA Driver for Amazon EC2",
       "id": 6,
       "latest_version": "2.6.0",
+      "key": "ena",
       "created_at": "2023-06-23T12:00:00.000Z",
       "updated_at": "2023-06-23T12:00:00.000Z"
     },
@@ -53,6 +59,7 @@
       "description": "Amazon PV Driver for EC2",
       "id": 7,
       "latest_version": "8.4.1",
+      "key": "pv",
       "created_at": "2023-06-23T12:00:00.000Z",
       "updated_at": "2023-06-23T12:00:00.000Z"
     }

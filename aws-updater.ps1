@@ -102,6 +102,14 @@ class getEC2InstanceInformation {
 
 #region script
 
+# First we set some internal variables
+$version = 0.3
+$awsUpdateName = "AWS component updater $version"
+$awsTempPath = "$env:USERPROFILE\Desktop\awsTemp"
+
+Write-Host -ForegroundColor Green "$awsUpdateName running..."
+Write-Host ""
+
 # No point in running the script on a host that isn't an EC2 instance.
 $ec2Info = [getEC2InstanceInformation]::new()
 $ec2regex = "^i-(?:[a-f\d]{8}|[a-f\d]{17})$"
@@ -114,11 +122,6 @@ if ($($ec2Info.instanceId) -match $ec2regex) {
     Write-Error "Script is not running on an actual EC2 instance! Exiting..."
     Exit 1
 }
-
-# First we set some internal variables
-$version = 0.3
-$awsUpdateName = "AWS component updater $version"
-$awsTempPath = "$env:USERPROFILE\Desktop\awsTemp"
 
 # Then we get all installed applications and drivers
 $installedApps = @()

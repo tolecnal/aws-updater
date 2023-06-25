@@ -20,6 +20,7 @@ Just download the file *aws-updater.ps1*  to your desktop.
 - AWS NVMe Elastic Block Storage Adapter Driver
 - AWS PV Driver
 - Amazon SSM Agent
+- Amazon CloudWatch Agent
 
 ## Issues running the script?
 

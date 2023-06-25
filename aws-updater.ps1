@@ -24,6 +24,9 @@
     Version: 0.2
     Date: 2021-11-30
     Fixes: minor bug fixes and added capbability to write to the EventLog
+
+    Version: 0.3
+    Date: 2023-06-25
 #>
 
 #region functions
@@ -107,14 +110,14 @@ if ($($ec2Info.instanceId) -match $ec2regex) {
     Write-Host "Script is running on an actual EC2 instance, continuing..."
     Write-Host ""    
     Write-Host "Running on instance ID $($ec2Info.instanceId) in region $($ec2Info.region) under account $($ec2Info.accountId)"
-
 } else {
     Write-Error "Script is not running on an actual EC2 instance! Exiting..."
     Exit 1
 }
 
 # First we set some internal variables
-$awsUpdateName = "AWS component updater"
+$version = 0.3
+$awsUpdateName = "AWS component updater $version"
 $awsTempPath = "$env:USERPROFILE\Desktop\awsTemp"
 
 # Then we get all installed applications and drivers
@@ -256,6 +259,7 @@ if ( $choiceRTN -ne 1 ) {
     mkdir $awsTempPath -Force -ErrorAction SilentlyContinue | Out-Null
 
     # aws-cfn-bootstrap code
+    Write-Host ""
     Write-Host -ForegroundColor Green  "Checking aws-cfn-bootstrap"
     if ($cfnVersion -lt $cfnVersionLatest) {
         Write-Host "Installation outdated, upgrading..."
@@ -432,11 +436,12 @@ if ( $choiceRTN -ne 1 ) {
     }
     Write-Host " "
 
-    # clean up temp folder
+    # clean up temporary folder
     Write-Host "Cleaning up temporary files"
     Remove-Item $awsTempPath -Recurse -Force -ErrorAction SilentlyContinue | Out-Null
 
-    Write-Host -ForegroundColor Green "AWS update complete"
+    Write-Host ""
+    Write-Host -ForegroundColor Green "$awsUpdateName complete"
 }
 else {
     Write-Warning "Script aborted due to user input"

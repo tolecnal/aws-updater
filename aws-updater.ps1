@@ -185,6 +185,13 @@ Select-Object -First 1
 [System.Version]$cwaVersionLatest = $currentVersions.details | Where-Object { $_.key -like 'cwa' } | Select-Object -ExpandProperty latest_version
 [string]$cwaUrl = "https://s3.amazonaws.com/amazoncloudwatch-agent/windows/amd64/latest/amazon-cloudwatch-agent.msi"
 
+# In some cases the latest Amazon CloudWatch Agent is not installed
+# then we set the version number to 0.0.0.0 to install the driver
+[System.Version]$stancwaVersion = $installedDrivers | Where-Object { $_.DeviceName -like 'Amazon CloudWatch Agent' } | Select-Object -ExpandProperty DriverVersion | Sort-Object -Descending |
+Select-Object -First 1
+if ($null -eq $cwaVersion -and $stancwaVersion) {
+    $cwaVersion = "0.0.0.0"
+}
 
 # Then we create the table object used to display the
 # installed versions with their most recent ones

@@ -110,6 +110,10 @@ $awsTempPath = "$env:USERPROFILE\Desktop\awsTemp"
 Write-Host -ForegroundColor Green "$awsUpdateName $version running..."
 Write-Host ""
 
+# clean up temporary folder
+Write-Host "Cleaning up temporary files"
+Remove-Item $awsTempPath -Recurse -Force -ErrorAction SilentlyContinue | Out-Null
+
 # No point in running the script on a host that isn't an EC2 instance.
 $ec2Info = [getEC2InstanceInformation]::new()
 $ec2regex = "^i-(?:[a-f\d]{8}|[a-f\d]{17})$"
@@ -479,7 +483,6 @@ if ( $choiceRTN -ne 1 ) {
         Write-Host "Installation up to date, doing nothing"
     }
     Write-Host " "
-
 
     # clean up temporary folder
     Write-Host "Cleaning up temporary files"

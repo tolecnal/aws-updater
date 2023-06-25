@@ -187,7 +187,7 @@ Select-Object -First 1
 
 # In some cases the latest Amazon CloudWatch Agent is not installed
 # then we set the version number to 0.0.0.0 to install the driver
-[System.Version]$stancwaVersion = $installedDrivers | Where-Object { $_.DeviceName -like 'Amazon CloudWatch Agent' } | Select-Object -ExpandProperty DriverVersion | Sort-Object -Descending |
+[System.Version]$stancwaVersion = $installedApps | Where-Object { $_.DeviceName -like 'Amazon CloudWatch Agent' } | Select-Object -ExpandProperty DriverVersion | Sort-Object -Descending |
 Select-Object -First 1
 if ($null -eq $cwaVersion -and $stancwaVersion) {
     $cwaVersion = "0.0.0.0"

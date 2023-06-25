@@ -67,9 +67,51 @@ function Start-FileTransfer {
         }
     }
 }
+
+class getEC2InstanceInformation {
+    [int64]$accountId
+    [string]$architecture
+    [string]$availabilityZone
+    [array]$billingProducts
+    [string]$imageId
+    [string]$instanceId
+    [string]$instanceType
+    [IPAddress]$privateIp
+    [string]$region
+
+    getEC2InstanceInformation() {
+        $token = Invoke-WebRequest -URI http://169.254.169.254/latest/api/token -Method PUT -Headers @{ 'X-aws-ec2-metadata-token-ttl-seconds' = '21600' }
+        $res = Invoke-WebRequest -URI http://169.254.169.254/latest/dynamic/instance-identity/document -Headers @{ 'X-aws-ec2-metadata-token' = $token }
+        $res = $res | ConvertFrom-Json
+
+        $this.accountId = $res.accountId
+        $this.architecture = $res.architecture
+        $this.availabilityZone = $res.availabilityZone
+        $this.billingProducts = $res.billingProducts
+        $this.imageId = $res.imageId
+        $this.instanceId = $res.instanceId
+        $this.instanceType = $res.instanceType
+        $this.privateIp = $res.privateIp
+        $this.region = $res.region
+    }   
+}
 #endregion
 
 #region script
+
+# No point in running the script on a host that isn't an EC2 instance.
+$ec2Info = [getEC2InstanceInformation]::new()
+$ec2regex = "^i-(?:[a-f\d]{8}|[a-f\d]{17})$"
+
+if ($($ec2Info.instanceId) -match $ec2regex) {
+    Write-Host "Script is running on an actual EC2 instance, continuing..."
+    Write-Host ""    
+    Write-Host "Running on instance ID $($ec2Info.instanceId) in region $($ec2Info.region) under account $($ec2Info.accountId)"
+
+} else {
+    Write-Error "Script is not running on an actual EC2 instance! Exiting..."
+    Exit 1
+}
 
 # First we set some internal variables
 $awsUpdateName = "AWS component updater"

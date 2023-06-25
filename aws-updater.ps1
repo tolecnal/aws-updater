@@ -118,7 +118,8 @@ if ($($ec2Info.instanceId) -match $ec2regex) {
     Write-Host "Script is running on an actual EC2 instance, continuing..."
     Write-Host ""    
     Write-Host "Running on instance ID $($ec2Info.instanceId) in region $($ec2Info.region) under account $($ec2Info.accountId)"
-} else {
+}
+else {
     Write-Error "Script is not running on an actual EC2 instance! Exiting..."
     Exit 1
 }
@@ -179,6 +180,12 @@ Select-Object -First 1
 [System.Version]$ssmVersionLatest = $currentVersions.details | Where-Object { $_.key -like 'ssm' } | Select-Object -ExpandProperty latest_version
 [string]$ssmUrl = "https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/windows_amd64/AmazonSSMAgentSetup.exe"
 
+[System.Version]$cwaVersion = $installedApps | Where-Object { $_.DisplayName -like 'Amazon CloudWatch Agent' } | Select-Object -ExpandProperty DisplayVersion | Sort-Object -Descending |
+Select-Object -First 1
+[System.Version]$cwaVersionLatest = $currentVersions.details | Where-Object { $_.key -like 'cwa' } | Select-Object -ExpandProperty latest_version
+[string]$cwaUrl = "https://s3.amazonaws.com/amazoncloudwatch-agent/windows/amd64/latest/amazon-cloudwatch-agent.msi"
+
+
 # Then we create the table object used to display the
 # installed versions with their most recent ones
 $tabName = "Amazon AWS installed components"
@@ -225,6 +232,12 @@ $row = $table.NewRow()
 $row.Name = "Amazon SSM Agent"
 $row.instVersion = $ssmVersion
 $row.offVersion = $ssmVersionLatest
+$table.Rows.Add($row)
+
+$row = $table.NewRow()
+$row.Name = "Amazon CloudWatch Agent"
+$row.instVersion = $cwaVersion
+$row.offVersion = $cwaVersionLatest
 $table.Rows.Add($row)
 
 # Display the tables
@@ -285,7 +298,7 @@ if ( $choiceRTN -ne 1 ) {
         Start-FileTransfer -url $cfnURL -destination $cfnTempPath | Out-Null
         Unblock-File -Path $cfnTempPath
 
-        Invoke-Item $cfnTempPath | Out-Null
+        Start-Process -Wait $cfnTempPath | Out-Null
     
         Write-EventLog -LogName "Setup" -Source $awsUpdateName -EventId 2 -Category 1 -EntryType Information -Message "aws-cfn-bootstrap upgraded from $cfnVersion to $cfnVersionLatest"
         Write-Output "Job aws-cfn-bootstrap complete"
@@ -319,7 +332,7 @@ if ( $choiceRTN -ne 1 ) {
         Unblock-File -Path $ec2launchTempPath
 
         try {
-            msiexec /i "$ec2launchTempPath" | Out-Null
+            & msiexec.exe /i "$ec2launchTempPath" | Out-Null
         }
         catch {
             Write-Host "An error running msiexec for ec2Launch"
@@ -410,7 +423,7 @@ if ( $choiceRTN -ne 1 ) {
         Unblock-File $pvTempPath
 
         Expand-Archive -Path $pvTempPath -DestinationPath "$awsTempPath\AWSPVDriver" | Out-Null
-        msiexec /i "$awsTempPath\AWSPVDriver\install.ps1" | Out-Null
+        & msiexec.exe /i "$awsTempPath\AWSPVDriver\install.ps1" | Out-Null
  
         Write-EventLog -LogName "Setup" -Source $awsUpdateName -EventId 2 -Category 1 -EntryType Information -Message "PV driver upgraded from $pvVersion to $pvVersionLatest"
         Write-Host "Job PV Driver complete"
@@ -438,6 +451,26 @@ if ( $choiceRTN -ne 1 ) {
         Write-Host "Installation up to date, doing nothing"
     }
     Write-Host " "
+
+    # CloudWatch Agent code
+    Write-Host -ForegroundColor Green "AWS CloudWatch Agent"
+    if ($cwaVersion -lt $cwaVersionLatest) {
+        Write-Host "Installation outdated, upgrading..."
+
+        $cwaTempPath = "$awsTempPath\amazon-cloudwatch-agent.msi"
+        Start-FileTransfer -url $cwaUrl -destination $cwaTempPath | Out-Null
+        Unblock-File $cwaTempPath
+
+        & msiexec.exe /i "$awsTempPath\amazon-cloudwatch-agent.msi" | Out-Null
+ 
+        Write-EventLog -LogName "Setup" -Source $awsUpdateName -EventId 2 -Category 1 -EntryType Information -Message "Amazon CloudWatch agent upgraded from $cwaVersion to $cwaVersionLatest"
+        Write-Host "Job Amazon CloudWatch Agent complete"
+    }
+    else {
+        Write-Host "Installation up to date, doing nothing"
+    }
+    Write-Host " "
+
 
     # clean up temporary folder
     Write-Host "Cleaning up temporary files"

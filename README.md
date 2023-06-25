@@ -1,6 +1,6 @@
 # aws-updater.ps1
 
-This script is used to update all installed AWS components on EC2 instances.
+This script is used to update all installed AWS components install on an EC2 instance.
 
 # Files
 

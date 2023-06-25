@@ -468,7 +468,9 @@ if ( $choiceRTN -ne 1 ) {
         Start-FileTransfer -url $cwaUrl -destination $cwaTempPath | Out-Null
         Unblock-File $cwaTempPath
 
+        Stop-Service -Name "AmazonCloudWatchAgent" -Force -ErrorAction SilentlyContinue | Out-Null
         & msiexec.exe /i "$awsTempPath\amazon-cloudwatch-agent.msi" | Out-Null
+        Start-Service -Name "AmazonCloudWatchAgent" | Out-Null
  
         Write-EventLog -LogName "Setup" -Source $awsUpdateName -EventId 2 -Category 1 -EntryType Information -Message "Amazon CloudWatch agent upgraded from $cwaVersion to $cwaVersionLatest"
         Write-Host "Job Amazon CloudWatch Agent complete"

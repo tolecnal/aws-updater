@@ -104,10 +104,10 @@ class getEC2InstanceInformation {
 
 # First we set some internal variables
 $version = 0.3
-$awsUpdateName = "AWS component updater $version"
+$awsUpdateName = "AWS component updater"
 $awsTempPath = "$env:USERPROFILE\Desktop\awsTemp"
 
-Write-Host -ForegroundColor Green "$awsUpdateName running..."
+Write-Host -ForegroundColor Green "$awsUpdateName $version running..."
 Write-Host ""
 
 # No point in running the script on a host that isn't an EC2 instance.
@@ -444,7 +444,7 @@ if ( $choiceRTN -ne 1 ) {
     Remove-Item $awsTempPath -Recurse -Force -ErrorAction SilentlyContinue | Out-Null
 
     Write-Host ""
-    Write-Host -ForegroundColor Green "$awsUpdateName complete"
+    Write-Host -ForegroundColor Green "$awsUpdateName $version complete"
 }
 else {
     Write-Warning "Script aborted due to user input"

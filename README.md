@@ -4,13 +4,17 @@ This script is used to update all installed AWS components install on an EC2 ins
 
 # Files
 
-Just download the file *aws-updater.ps1*  to your desktop.
+Just download the file *aws-updater.ps1*  to your desktop and run it.
 
 ## Run script
 
-- start a PowerShell session with *Administrative privileges*
-- cd $ENV:USERPROFILE\Desktop
-- .\aws-updater.ps1
+Start a PowerShell session with Administrative privileges
+
+```
+cd $ENV:USERPROFILE\Desktop
+Start-BitsTransfer https://raw.githubusercontent.com/tolecnal/aws-updater/main/aws-updater.ps1
+.\aws-updater.ps1
+```
 
 ## Components checked
 

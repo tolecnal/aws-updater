@@ -209,7 +209,7 @@ class getEC2InstanceInformation {
 #region script
 
 # First we set some internal variables
-$version = 0.3
+$version = 0.4
 $awsUpdateName = "AWS component updater"
 $awsTempPath = "$env:USERPROFILE\Desktop\awsTemp"
 

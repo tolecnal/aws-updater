@@ -1,8 +1,5 @@
 #requires -version 4.0 -runasadministrator
 
-# fix for TLS issue
-[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-
 <#
     .Synopsis
     This script is used to udpate AWS software components on an EC2 instance
@@ -27,7 +24,27 @@
 
     Version: 0.3
     Date: 2023-06-25
+    Fixes: major rewrite to avoid Win32_Product WMI class to get installed applications.
+    This as this class is known to cause problems on some systems.
+        ref: https://gregramsey.net/2012/02/20/win32_product-is-evil/
+        ref: https://www.itninja.com/blog/view/win32-product-is-evil
+        ref: https://xkln.net/blog/please-stop-using-win32product-to-find-installed-software-alternatives-inside/
+
+    Version: 0.4
+    Date: 2023-06-27
+    Fixes: borrowed function code for 'Get-InstalledApplications' from xkln.net. Added class to check if we are
+    running this script on an actual EC2 instance, by querying the EC2 metadata service. This is to avoid running
+    the script on non-EC2 instances.
 #>
+
+#region parameters
+[CmdletBinding()]
+param (
+    [Parameter(Mandatory = $false, HelpMessage = "Include Amazon CloudWatch Agent in the update")]
+    [switch]
+    $cwa = $false
+)
+#endregion parameters
 
 #region functions
 function Start-FileTransfer {
@@ -71,6 +88,95 @@ function Start-FileTransfer {
     }
 }
 
+function Get-InstalledApplications() {
+    [cmdletbinding(DefaultParameterSetName = 'GlobalAndAllUsers')]
+
+    Param (
+        [Parameter(ParameterSetName = "Global")]
+        [switch]$Global,
+        [Parameter(ParameterSetName = "GlobalAndCurrentUser")]
+        [switch]$GlobalAndCurrentUser,
+        [Parameter(ParameterSetName = "GlobalAndAllUsers")]
+        [switch]$GlobalAndAllUsers,
+        [Parameter(ParameterSetName = "CurrentUser")]
+        [switch]$CurrentUser,
+        [Parameter(ParameterSetName = "AllUsers")]
+        [switch]$AllUsers
+    )
+
+    # Excplicitly set default param to True if used to allow conditionals to work
+    if ($PSCmdlet.ParameterSetName -eq "GlobalAndAllUsers") {
+        $GlobalAndAllUsers = $true
+    }
+
+    # Check if running with Administrative privileges if required
+    if ($GlobalAndAllUsers -or $AllUsers) {
+        $RunningAsAdmin = (New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+        if ($RunningAsAdmin -eq $false) {
+            Write-Error "Finding all user applications requires administrative privileges"
+            break
+        }
+    }
+
+    # Empty array to store applications
+    $Apps = @()
+    $32BitPath = "SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
+    $64BitPath = "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*"
+
+    # Retreive globally insatlled applications
+    if ($Global -or $GlobalAndAllUsers -or $GlobalAndCurrentUser) {
+        Write-Host "Processing global hive"
+        $Apps += Get-ItemProperty "HKLM:\$32BitPath"
+        $Apps += Get-ItemProperty "HKLM:\$64BitPath"
+    }
+
+    if ($CurrentUser -or $GlobalAndCurrentUser) {
+        Write-Host "Processing current user hive"
+        $Apps += Get-ItemProperty "Registry::\HKEY_CURRENT_USER\$32BitPath"
+        $Apps += Get-ItemProperty "Registry::\HKEY_CURRENT_USER\$64BitPath"
+    }
+
+    if ($AllUsers -or $GlobalAndAllUsers) {
+        Write-Host "Collecting hive data for all users"
+        $AllProfiles = Get-CimInstance Win32_UserProfile | Select LocalPath, SID, Loaded, Special | Where { $_.SID -like "S-1-5-21-*" }
+        $MountedProfiles = $AllProfiles | Where { $_.Loaded -eq $true }
+        $UnmountedProfiles = $AllProfiles | Where { $_.Loaded -eq $false }
+
+        Write-Host "Processing mounted hives"
+        $MountedProfiles | % {
+            $Apps += Get-ItemProperty -Path "Registry::\HKEY_USERS\$($_.SID)\$32BitPath"
+            $Apps += Get-ItemProperty -Path "Registry::\HKEY_USERS\$($_.SID)\$64BitPath"
+        }
+
+        Write-Host "Processing unmounted hives"
+        $UnmountedProfiles | % {
+
+            $Hive = "$($_.LocalPath)\NTUSER.DAT"
+            Write-Host " -> Mounting hive at $Hive"
+
+            if (Test-Path $Hive) {
+            
+                REG LOAD HKU\temp $Hive
+
+                $Apps += Get-ItemProperty -Path "Registry::\HKEY_USERS\temp\$32BitPath"
+                $Apps += Get-ItemProperty -Path "Registry::\HKEY_USERS\temp\$64BitPath"
+
+                # Run manual GC to allow hive to be unmounted
+                [GC]::Collect()
+                [GC]::WaitForPendingFinalizers()
+            
+                REG UNLOAD HKU\temp
+
+            }
+            else {
+                Write-Warning "Unable to access registry hive at $Hive"
+            }
+        }
+    }
+
+    return $Apps
+}
+
 class getEC2InstanceInformation {
     [int64]$accountId
     [string]$architecture
@@ -107,6 +213,9 @@ $version = 0.3
 $awsUpdateName = "AWS component updater"
 $awsTempPath = "$env:USERPROFILE\Desktop\awsTemp"
 
+# fix for TLS issue
+[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+
 Write-Host -ForegroundColor Green "$awsUpdateName $version running..."
 Write-Host ""
 
@@ -120,8 +229,9 @@ $ec2regex = "^i-(?:[a-f\d]{8}|[a-f\d]{17})$"
 
 if ($($ec2Info.instanceId) -match $ec2regex) {
     Write-Host "Script is running on an actual EC2 instance, continuing..."
-    Write-Host ""    
+    Write-Host ""
     Write-Host "Running on instance ID $($ec2Info.instanceId) in region $($ec2Info.region) under account $($ec2Info.accountId)"
+    Write-Host ""
 }
 else {
     Write-Error "Script is not running on an actual EC2 instance! Exiting..."
@@ -129,10 +239,7 @@ else {
 }
 
 # Then we get all installed applications and drivers
-$installedApps = @()
-$installedApps += Get-ItemProperty "HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" # 32 Bit
-$installedApps += Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*"  
-$installedApps = $installedApps | Select-Object DisplayName, DisplayVersion
+$installedApps = Get-InstalledApplications
 $installedDrivers = Get-WmiObject Win32_PnPSignedDriver | Select-Object DeviceName, Manufacturer, DriverVersion
 
 try {
@@ -184,17 +291,19 @@ Select-Object -First 1
 [System.Version]$ssmVersionLatest = $currentVersions.details | Where-Object { $_.key -like 'ssm' } | Select-Object -ExpandProperty latest_version
 [string]$ssmUrl = "https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/windows_amd64/AmazonSSMAgentSetup.exe"
 
-[System.Version]$cwaVersion = $installedApps | Where-Object { $_.DisplayName -like 'Amazon CloudWatch Agent' } | Select-Object -ExpandProperty DisplayVersion | Sort-Object -Descending |
-Select-Object -First 1
-[System.Version]$cwaVersionLatest = $currentVersions.details | Where-Object { $_.key -like 'cwa' } | Select-Object -ExpandProperty latest_version
-[string]$cwaUrl = "https://s3.amazonaws.com/amazoncloudwatch-agent/windows/amd64/latest/amazon-cloudwatch-agent.msi"
+if ($cwa) {
+    [System.Version]$cwaVersion = $installedApps | Where-Object { $_.DisplayName -like 'Amazon CloudWatch Agent' } | Select-Object -ExpandProperty DisplayVersion | Sort-Object -Descending |
+    Select-Object -First 1
+    [System.Version]$cwaVersionLatest = $currentVersions.details | Where-Object { $_.key -like 'cwa' } | Select-Object -ExpandProperty latest_version
+    [string]$cwaUrl = "https://s3.amazonaws.com/amazoncloudwatch-agent/windows/amd64/latest/amazon-cloudwatch-agent.msi"
 
-# In some cases the latest Amazon CloudWatch Agent is not installed
-# then we set the version number to 0.0.0.0 to install the driver
-[System.Version]$stancwaVersion = $installedApps | Where-Object { $_.DeviceName -like 'Amazon CloudWatch Agent' } | Select-Object -ExpandProperty DriverVersion | Sort-Object -Descending |
-Select-Object -First 1
-if ($null -eq $cwaVersion -and $stancwaVersion) {
-    $cwaVersion = "0.0.0.0"
+    # In some cases the latest Amazon CloudWatch Agent is not installed
+    # then we set the version number to 0.0.0.0 to install the driver
+    [System.Version]$stancwaVersion = $installedApps | Where-Object { $_.DeviceName -like 'Amazon CloudWatch Agent' } | Select-Object -ExpandProperty DriverVersion | Sort-Object -Descending |
+    Select-Object -First 1
+    if ($null -eq $cwaVersion -and $stancwaVersion) {
+        $cwaVersion = "0.0.0.0"
+    }
 }
 
 # Then we create the table object used to display the
@@ -245,11 +354,13 @@ $row.instVersion = $ssmVersion
 $row.offVersion = $ssmVersionLatest
 $table.Rows.Add($row)
 
-$row = $table.NewRow()
-$row.Name = "Amazon CloudWatch Agent"
-$row.instVersion = $cwaVersion
-$row.offVersion = $cwaVersionLatest
-$table.Rows.Add($row)
+if ($cwa) {
+    $row = $table.NewRow()
+    $row.Name = "Amazon CloudWatch Agent"
+    $row.instVersion = $cwaVersion
+    $row.offVersion = $cwaVersionLatest
+    $table.Rows.Add($row)
+}
 
 # Display the tables
 $table | Format-Table
@@ -316,8 +427,8 @@ if ( $choiceRTN -ne 1 ) {
     }
     else {
         Write-Host "Installation up to date, doing nothing"
+        Write-Host " "
     }
-    Write-Host " "
 
     # ec2launch code
     Write-Host -ForegroundColor Green "Checking Amazon EC2Launch"
@@ -354,8 +465,9 @@ if ( $choiceRTN -ne 1 ) {
     }
     else {
         Write-Host "Installation up to date, doing nothing"
+        Write-Host " "
     }
-    Write-Host " "
+    
 
     # ENA driver code
     Write-Host -ForegroundColor Green "Amazon Elastic Network Adapter"
@@ -388,8 +500,8 @@ if ( $choiceRTN -ne 1 ) {
     }
     else {
         Write-Host "Installation up to date, doing nothing"
+        Write-Host " "
     }
-    Write-Host " "
 
     # NVMe driver code
     Write-Host -ForegroundColor Green "AWS NVMe Elastic Block Storage Adapter"
@@ -421,8 +533,8 @@ if ( $choiceRTN -ne 1 ) {
     }
     else {
         Write-Host "Installation up to date, doing nothing"
+        Write-Host " "
     }
-    Write-Host " "
 
     # PV Driver code
     Write-Host -ForegroundColor Green "AWS PV Drivers"
@@ -441,8 +553,8 @@ if ( $choiceRTN -ne 1 ) {
     }
     else {
         Write-Host "Installation up to date, doing nothing"
+        Write-Host " "
     }
-    Write-Host " "
 
     # SSM agent code
     Write-Host -ForegroundColor Green "Amazon SSM Agent"
@@ -460,29 +572,33 @@ if ( $choiceRTN -ne 1 ) {
     }
     else {
         Write-Host "Installation up to date, doing nothing"
+        Write-Host " "
     }
-    Write-Host " "
+    
 
     # CloudWatch Agent code
-    Write-Host -ForegroundColor Green "AWS CloudWatch Agent"
-    if ($cwaVersion -lt $cwaVersionLatest) {
-        Write-Host "Installation outdated, upgrading..."
+    if ($cwa) {
+        Write-Host -ForegroundColor Green "AWS CloudWatch Agent"
+        if ($cwaVersion -lt $cwaVersionLatest) {
+            Write-Host "Installation outdated, upgrading..."
 
-        $cwaTempPath = "$awsTempPath\amazon-cloudwatch-agent.msi"
-        Start-FileTransfer -url $cwaUrl -destination $cwaTempPath | Out-Null
-        Unblock-File $cwaTempPath
+            $cwaTempPath = "$awsTempPath\amazon-cloudwatch-agent.msi"
+            Start-FileTransfer -url $cwaUrl -destination $cwaTempPath | Out-Null
+            Unblock-File $cwaTempPath
 
-        Stop-Service -Name "AmazonCloudWatchAgent" -Force -ErrorAction SilentlyContinue | Out-Null
-        & msiexec.exe /i "$awsTempPath\amazon-cloudwatch-agent.msi" | Out-Null
-        Start-Service -Name "AmazonCloudWatchAgent" | Out-Null
+            Stop-Service -Name "AmazonCloudWatchAgent" -Force -ErrorAction SilentlyContinue | Out-Null
+            & msiexec.exe /i "$awsTempPath\amazon-cloudwatch-agent.msi" | Out-Null
+            Start-Service -Name "AmazonCloudWatchAgent" | Out-Null
  
-        Write-EventLog -LogName "Setup" -Source $awsUpdateName -EventId 2 -Category 1 -EntryType Information -Message "Amazon CloudWatch agent upgraded from $cwaVersion to $cwaVersionLatest"
-        Write-Host "Job Amazon CloudWatch Agent complete"
+            Write-EventLog -LogName "Setup" -Source $awsUpdateName -EventId 2 -Category 1 -EntryType Information -Message "Amazon CloudWatch agent upgraded from $cwaVersion to $cwaVersionLatest"
+            Write-Host "Job Amazon CloudWatch Agent complete"
+        }
+        else {
+            Write-Host "Installation up to date, doing nothing"
+            Write-Host " "
+        }
     }
-    else {
-        Write-Host "Installation up to date, doing nothing"
-    }
-    Write-Host " "
+    
 
     # clean up temporary folder
     Write-Host "Cleaning up temporary files"

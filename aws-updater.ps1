@@ -407,8 +407,7 @@ if ( $choiceRTN -ne 1 ) {
         Start-Sleep 10
         if ($app) {
             try {
-                $app.Uninstall() | Out-Null
-                Start-Sleep 45
+                & $app.Uninstall() | Out-Null
             }
             catch {
                 Write-Host "An error occured during uninstall of aws-cfn-bootstrap"
@@ -420,7 +419,7 @@ if ( $choiceRTN -ne 1 ) {
         Start-FileTransfer -url $cfnURL -destination $cfnTempPath | Out-Null
         Unblock-File -Path $cfnTempPath
 
-        Start-Process -Wait $cfnTempPath | Out-Null
+        Start-Process -Wait $cfnTempPath -ArgumentList "/install /passive" | Out-Null
     
         Write-EventLog -LogName "Setup" -Source $awsUpdateName -EventId 2 -Category 1 -EntryType Information -Message "aws-cfn-bootstrap upgraded from $cfnVersion to $cfnVersionLatest"
         Write-Output "Job aws-cfn-bootstrap complete"
@@ -454,7 +453,7 @@ if ( $choiceRTN -ne 1 ) {
         Unblock-File -Path $ec2launchTempPath
 
         try {
-            & msiexec.exe /i "$ec2launchTempPath" | Out-Null
+            & msiexec.exe /i "$ec2launchTempPath" ADDLOCAL=“Basic,Clean” /q | Out-Null
         }
         catch {
             Write-Host "An error running msiexec for ec2Launch"

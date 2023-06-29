@@ -138,18 +138,18 @@ function Get-InstalledApplications() {
 
     if ($AllUsers -or $GlobalAndAllUsers) {
         Write-Host "Collecting hive data for all users"
-        $AllProfiles = Get-CimInstance Win32_UserProfile | Select LocalPath, SID, Loaded, Special | Where { $_.SID -like "S-1-5-21-*" }
-        $MountedProfiles = $AllProfiles | Where { $_.Loaded -eq $true }
-        $UnmountedProfiles = $AllProfiles | Where { $_.Loaded -eq $false }
+        $AllProfiles = Get-CimInstance Win32_UserProfile | Select-Object LocalPath, SID, Loaded, Special | Where-Object { $_.SID -like "S-1-5-21-*" }
+        $MountedProfiles = $AllProfiles | Where-Object { $_.Loaded -eq $true }
+        $UnmountedProfiles = $AllProfiles | Where-Object { $_.Loaded -eq $false }
 
         Write-Host "Processing mounted hives"
-        $MountedProfiles | % {
+        $MountedProfiles | ForEach-Object {
             $Apps += Get-ItemProperty -Path "Registry::\HKEY_USERS\$($_.SID)\$32BitPath"
             $Apps += Get-ItemProperty -Path "Registry::\HKEY_USERS\$($_.SID)\$64BitPath"
         }
 
         Write-Host "Processing unmounted hives"
-        $UnmountedProfiles | % {
+        $UnmountedProfiles | ForEach-Object {
 
             $Hive = "$($_.LocalPath)\NTUSER.DAT"
             Write-Host " -> Mounting hive at $Hive"
@@ -402,12 +402,13 @@ if ( $choiceRTN -ne 1 ) {
     if ($cfnVersion -lt $cfnVersionLatest) {
         Write-Host "Installation outdated, upgrading..."
         Write-Host "... first uninstalling current version"
+        Write-Host ""
 
-        $app = Get-WmiObject -Class Win32_Product -Filter "Name = 'aws-cfn-bootstrap'"
+        $cfnApp = Get-Package -ProviderName Programs -IncludeWindowsInstaller -Name aws-cfn-bootstrap
         Start-Sleep 10
         if ($app) {
             try {
-                & $app.Uninstall() | Out-Null
+                Uninstall-Package $cfnApp
             }
             catch {
                 Write-Host "An error occured during uninstall of aws-cfn-bootstrap"
@@ -433,6 +434,7 @@ if ( $choiceRTN -ne 1 ) {
     Write-Host -ForegroundColor Green "Checking Amazon EC2Launch"
     if ($ec2launchVersion -lt $ec2launchVersionLatest) {
         Write-Host "Installation outdated, upgrading..."
+        Write-Host ""
 
         $app = Get-WmiObject -Class Win32_Product -Filter "Name = 'EC2ConfigService'"
         Start-Sleep 10
@@ -473,6 +475,7 @@ if ( $choiceRTN -ne 1 ) {
     if ($enaVersion -lt $enaVersionLatest) {
 
         Write-Host "Installation outdated, upgrading..."
+        Write-Host ""
 
         $enaTempPath = "$awsTempPath\AwsEnaNetworkDriver.zip"
         Start-FileTransfer -url $enaUrl -destination $enaTempPath | Out-Null
@@ -506,6 +509,7 @@ if ( $choiceRTN -ne 1 ) {
     Write-Host -ForegroundColor Green "AWS NVMe Elastic Block Storage Adapter"
     if ($nvmeVersion -lt $nvmeVersionLatest) {
         Write-Host "Installation outdated, upgrading..."
+        Write-Host ""
 
         $nvmeTempPath = "$awsTempPath\AWSNVMe.zip"
         Start-FileTransfer -url $nvmwUrl -destination $nvmeTempPath | Out-Null
@@ -539,6 +543,7 @@ if ( $choiceRTN -ne 1 ) {
     Write-Host -ForegroundColor Green "AWS PV Drivers"
     if ($pvVersion -lt $pvVersionLatest) {
         Write-Host "Installation outdated, upgrading..."
+        Write-Host ""
 
         $pvTempPath = "$awsTempPath\AWSPVDriver.zip"
         Start-FileTransfer -url $pvUrl -destination $pvTempPath | Out-Null
@@ -559,6 +564,7 @@ if ( $choiceRTN -ne 1 ) {
     Write-Host -ForegroundColor Green "Amazon SSM Agent"
     if ($ssmVersion -lt $ssmVersionLatest) {
         Write-Host "Installation outdated, upgrading..."
+        Write-Host ""
 
         $ssmTempPath = "$awsTempPath\AmazonSSMAgentSetup.exe"
         Start-FileTransfer -url $ssmUrl -destination $ssmTempPath | Out-Null
@@ -580,6 +586,7 @@ if ( $choiceRTN -ne 1 ) {
         Write-Host -ForegroundColor Green "AWS CloudWatch Agent"
         if ($cwaVersion -lt $cwaVersionLatest) {
             Write-Host "Installation outdated, upgrading..."
+            Write-Host ""
 
             $cwaTempPath = "$awsTempPath\amazon-cloudwatch-agent.msi"
             Start-FileTransfer -url $cwaUrl -destination $cwaTempPath | Out-Null
@@ -587,7 +594,7 @@ if ( $choiceRTN -ne 1 ) {
 
             Stop-Service -Name "AmazonCloudWatchAgent" -Force -ErrorAction SilentlyContinue | Out-Null
             & msiexec.exe /i "$awsTempPath\amazon-cloudwatch-agent.msi" | Out-Null
-            Start-Service -Name "AmazonCloudWatchAgent" | Out-Null
+            Start-Service -Name "AmazonCloudWatchAgent" -Force -ErrorAction SilentlyContinue | Out-Null
  
             Write-EventLog -LogName "Setup" -Source $awsUpdateName -EventId 2 -Category 1 -EntryType Information -Message "Amazon CloudWatch agent upgraded from $cwaVersion to $cwaVersionLatest"
             Write-Host "Job Amazon CloudWatch Agent complete"

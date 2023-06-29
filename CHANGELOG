@@ -1,0 +1,47 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [0.41] - 2023-06-29
+
+### Fixed
+
+- Fixed some minor linting issues for the PS code.
+  
+### Changed
+
+- removed last usage of 'Win32_Product' for WMI. Using Uninstall-Package instead of $app.UnInstall().
+    
+## [0.4] - 2023-06-27
+
+### Added
+
+- Borrowed function code for 'Get-InstalledApplications' from xkln.net. 
+- Added class to check if we are - Running this script on an actual EC2 instance, by querying the EC2 metadata service.
+ 
+## [0.3] - 2023-06-25
+
+### Fixes
+
+- major rewrite to avoid Win32_Product WMI class to get installed applications.
+  This as this class is known to cause problems on some systems.
+  -  ref: https://gregramsey.net/2012/02/20/win32_product-is-evil/
+  -  ref: https://www.itninja.com/blog/view/win32-product-is-evil
+  -  ref: https://xkln.net/blog/please-stop-using-win32product-to-find-installed-software-alternatives-inside/
+
+## [0.2] - 2021-11-30
+
+### Fixes
+
+- minor bug fixes and added capbability to write to the EventLog
+    
+## [0.1] - 2021-11-30
+
+### Added
+
+- Initial release of script

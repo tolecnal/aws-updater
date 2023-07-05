@@ -189,8 +189,8 @@ class getEC2InstanceInformation {
     [string]$region
 
     getEC2InstanceInformation() {
-        $token = Invoke-WebRequest -URI http://169.254.169.254/latest/api/token -Method PUT -Headers @{ 'X-aws-ec2-metadata-token-ttl-seconds' = '21600' }
-        $res = Invoke-WebRequest -URI http://169.254.169.254/latest/dynamic/instance-identity/document -Headers @{ 'X-aws-ec2-metadata-token' = $token }
+        $token = Invoke-WebRequest -URI http://169.254.169.254/latest/api/token -Method PUT -Headers @{ 'X-aws-ec2-metadata-token-ttl-seconds' = '21600' } -UseBasicParsing
+        $res = Invoke-WebRequest -URI http://169.254.169.254/latest/dynamic/instance-identity/document -Headers @{ 'X-aws-ec2-metadata-token' = $token } -UseBasicParsing
         $res = $res | ConvertFrom-Json
 
         $this.accountId = $res.accountId
